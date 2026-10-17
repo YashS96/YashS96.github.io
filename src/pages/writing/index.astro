@@ -10,9 +10,9 @@ const posts = (await getCollection('writing', ({ data }) => !data.draft)).sort(
 const fmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 ---
 
-<Base title="Writing · Yash Shrivastava" description="Deep dives into how systems actually work, with diagrams.">
+<Base title="Deep Dives · Yash Shrivastava" description="Deep dives into how systems actually work, with diagrams.">
   <section class="listing">
-    <h1>Writing</h1>
+    <h1>Deep Dives</h1>
     <p class="lead">Deep dives into how systems actually work, one diagram at a time.</p>
     {
       posts.map((post) => (
