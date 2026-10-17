@@ -1,0 +1,645 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Yash Shrivastava, software engineer building event-driven distributed systems on AWS and Kubernetes.">
+<title>Yash Shrivastava</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: dark-first. Sticky pill nav -> split hero with live event-flow diagram -> bento of shipped systems -> compact timeline -> stack clusters -> outside-work strip -> contact */
+:root{
+  --bg:#0A0E13; --bg-2:#0F151C; --surface:#121A22; --surface-2:#17212B; --ink:#E8EEF3; --muted:#8C9AA8; --line:#222E39;
+  --accent:#6FB8FF; --accent-2:#FFB45E; --ok:#5FD6A4; --err:#FF7B7B; --glow:rgba(111,184,255,.14);
+  --f-sans:"Geist", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  --f-mono:"Geist Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]){
+  --bg:#F5F7FA; --bg-2:#EDF1F5; --surface:#FFFFFF; --surface-2:#F3F6F9; --ink:#0F1A24; --muted:#5A6978; --line:#DCE3EA;
+  --accent:#1F6FD1; --accent-2:#B8620A; --ok:#18855A; --err:#C7362F; --glow:rgba(31,111,209,.10); color-scheme:light}}
+:root[data-theme="light"]{
+  --bg:#F5F7FA; --bg-2:#EDF1F5; --surface:#FFFFFF; --surface-2:#F3F6F9; --ink:#0F1A24; --muted:#5A6978; --line:#DCE3EA;
+  --accent:#1F6FD1; --accent-2:#B8620A; --ok:#18855A; --err:#C7362F; --glow:rgba(31,111,209,.10); color-scheme:light}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--ink);font:400 1rem/1.6 var(--f-sans);-webkit-font-smoothing:antialiased;
+  background-image:radial-gradient(900px 480px at 85% -10%,var(--glow),transparent 70%),
+  linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+  background-size:auto,56px 56px,56px 56px;background-attachment:fixed;background-position:0 0,-1px -1px,-1px -1px}
+body::before{content:"";position:fixed;inset:0;background:linear-gradient(180deg,transparent 0,var(--bg) 70%);pointer-events:none;z-index:0;opacity:.9}
+main,nav{position:relative;z-index:1}
+a{color:inherit}
+a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:6px}
+h1,h2,h3{margin:0;text-wrap:balance;letter-spacing:-.025em}
+p{margin:0}
+.mono{font-family:var(--f-mono)}
+.wrap{max-width:1120px;margin:0 auto;padding-inline:clamp(16px,4vw,32px)}
+.label{font:500 .72rem/1 var(--f-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+
+/* nav */
+.nav{position:sticky;top:calc(env(safe-area-inset-top,0px) + 14px);z-index:10;display:flex;justify-content:center;padding-inline:16px}
+.nav-inner{display:flex;align-items:center;gap:4px;padding:6px;border:1px solid var(--line);border-radius:999px;
+  background:color-mix(in srgb,var(--surface) 78%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);max-width:100%;overflow-x:auto}
+.nav a{font:500 .85rem/1 var(--f-sans);text-decoration:none;color:var(--muted);padding:9px 14px;border-radius:999px;white-space:nowrap}
+.nav a:hover{color:var(--ink);background:var(--surface-2)}
+.nav .brand{color:var(--ink);font-weight:700;font-family:var(--f-mono)}
+
+/* hero */
+.hero{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:clamp(32px,5vw,64px);align-items:center;padding-block:clamp(56px,10vw,112px) clamp(48px,7vw,80px)}
+.hero-copy{display:grid;gap:22px}
+.pill{display:inline-flex;align-items:center;gap:10px;width:fit-content;font:500 .8rem/1 var(--f-mono);color:var(--muted);
+  border:1px solid var(--line);background:var(--surface);padding:8px 12px;border-radius:999px}
+.pill i{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 4px color-mix(in srgb,var(--ok) 22%,transparent)}
+h1{font-size:clamp(2.8rem,7.4vw,5.4rem);font-weight:800;line-height:.95}
+h1 .grad{background:linear-gradient(100deg,var(--ink) 30%,var(--accent) 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.lede{font-size:clamp(1.05rem,1.8vw,1.22rem);color:var(--muted);max-width:44ch}
+.lede b{color:var(--ink);font-weight:500}
+.ctas{display:flex;flex-wrap:wrap;gap:10px}
+.btn{display:inline-flex;align-items:center;gap:8px;font:600 .92rem/1 var(--f-sans);text-decoration:none;padding:12px 16px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;transition:border-color .2s,transform .2s}
+.btn:hover{border-color:var(--accent);transform:translateY(-1px)}
+.btn.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.btn svg{width:16px;height:16px;fill:currentColor}
+
+/* flow diagram */
+.flow{border:1px solid var(--line);border-radius:18px;background:linear-gradient(180deg,var(--surface),var(--bg-2));padding:18px;display:grid;gap:12px;box-shadow:0 30px 80px -40px var(--glow)}
+.flow-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.flow-head .dots{display:flex;gap:6px}.flow-head .dots i{width:9px;height:9px;border-radius:50%;background:var(--line)}
+.flow svg{width:100%;height:auto;display:block}
+.flow svg text{font-family:var(--f-mono);font-size:11px;fill:var(--muted)}
+.flow svg .node{fill:var(--surface-2);stroke:var(--line)}
+.flow svg .q{fill:color-mix(in srgb,var(--accent) 10%,var(--surface-2));stroke:color-mix(in srgb,var(--accent) 45%,var(--line))}
+.flow svg .edge{stroke:var(--line);stroke-width:1.5;fill:none;stroke-dasharray:4 5}
+.flow svg .msg{fill:var(--accent)}
+.flow svg .msg2{fill:var(--accent-2)}
+.flow svg .pod{fill:color-mix(in srgb,var(--ok) 14%,var(--surface-2));stroke:color-mix(in srgb,var(--ok) 55%,var(--line))}
+.flow svg .strong{fill:var(--ink);font-weight:500}
+.flow svg .tx{fill:none;stroke:color-mix(in srgb,var(--accent-2) 60%,var(--line));stroke-dasharray:5 4}
+.flow svg .inner{fill:var(--bg-2);stroke:var(--line)}
+.flow svg .pk{opacity:0}
+.flow svg .pk.ok{fill:var(--ok)} .flow svg .pk.err{fill:var(--err)}
+.flow svg .say{opacity:0;font-weight:500}
+.flow svg .say.ok{fill:var(--ok)} .flow svg .say.err{fill:var(--err)} .flow svg .say.acc{fill:var(--accent-2)}
+.flow svg .big{font-size:20px;fill:var(--muted)}
+.flow svg .bad{fill:color-mix(in srgb,var(--err) 12%,var(--surface-2));stroke:color-mix(in srgb,var(--err) 50%,var(--line))}
+.flow svg .pk-bar{opacity:0;fill:var(--accent)}
+.stage{display:grid;perspective:900px}
+.scene{grid-area:1/1;opacity:0;transform:rotateY(-80deg);transform-origin:50% 50%;transition:opacity .35s ease,transform .45s cubic-bezier(.3,.7,.2,1);}
+.scene.active{opacity:1;transform:none;transition-delay:.3s}
+.scene.leaving{opacity:0;transform:rotateY(80deg)}
+.progress{height:2px;background:var(--line);border-radius:2px;overflow:hidden}
+.progress i{display:block;height:100%;width:0;background:var(--accent)}
+.caption{display:grid;gap:6px;min-height:4.6em}
+.caption h3{font-size:1.02rem;font-weight:600;letter-spacing:-.01em}
+.caption p{color:var(--muted);font-size:.86rem;line-height:1.45}
+.steps{display:flex;flex-wrap:wrap;gap:6px 14px;font:500 .74rem/1 var(--f-mono);color:var(--muted)}
+.steps span{opacity:.5;transition:opacity .3s,color .3s}
+.steps span.on{opacity:1;color:var(--accent)}
+
+/* sections */
+section{padding-block:clamp(48px,8vw,88px)}
+.sec-head{display:flex;justify-content:space-between;align-items:end;gap:16px;flex-wrap:wrap;margin-bottom:28px}
+.sec-head h2{font-size:clamp(1.8rem,3.6vw,2.6rem);font-weight:700}
+.sec-head p{color:var(--muted);max-width:46ch}
+
+/* metrics strip */
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-block:1px solid var(--line)}
+.stat{padding:26px 20px;display:grid;gap:6px;border-right:1px solid var(--line)}
+.stat:last-child{border-right:0}
+.stat b{font:700 clamp(1.8rem,3.8vw,2.6rem)/1 var(--f-sans);letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.stat b span{color:var(--accent)}
+.stat small{color:var(--muted);font-size:.86rem;line-height:1.4}
+
+/* bento */
+.bento{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:14px}
+.card{position:relative;border:1px solid var(--line);border-radius:16px;background:var(--surface);padding:22px;display:grid;gap:12px;align-content:start;overflow:hidden;transition:border-color .25s,transform .25s}
+.card:hover{border-color:color-mix(in srgb,var(--accent) 50%,var(--line));transform:translateY(-2px)}
+.card::after{content:"";position:absolute;inset:-1px;border-radius:inherit;pointer-events:none;background:radial-gradient(420px 160px at var(--mx,80%) var(--my,0%),var(--glow),transparent 70%);opacity:0;transition:opacity .3s}
+.card:hover::after{opacity:1}
+.card h3{font-size:1.22rem;font-weight:650}
+.card p{color:var(--muted);font-size:.95rem}
+.card .k{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.card .big{font:700 2.2rem/1 var(--f-sans);letter-spacing:-.03em;color:var(--ink)}
+.c-a{grid-column:span 4}.c-b{grid-column:span 2}.c-c{grid-column:span 2}.c-d{grid-column:span 2}.c-e{grid-column:span 2}.c-f{grid-column:span 3}.c-g{grid-column:span 3}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:auto}
+.tag{font:500 .72rem/1 var(--f-mono);padding:6px 8px;border-radius:6px;border:1px solid var(--line);color:var(--muted);background:var(--bg-2)}
+pre.code{margin:0;font:400 .8rem/1.6 var(--f-mono);background:var(--bg-2);border:1px solid var(--line);border-radius:10px;padding:14px;overflow-x:auto;color:var(--muted)}
+pre.code .kw{color:var(--accent)} pre.code .st{color:var(--accent-2)} pre.code .cm{opacity:.7}
+.ladder{display:flex;align-items:end;gap:6px;height:64px}
+.ladder i{flex:1;border-radius:4px 4px 0 0;background:color-mix(in srgb,var(--accent) 30%,var(--surface-2))}
+.ladder i:last-child{background:var(--accent)}
+
+/* timeline */
+.timeline{display:grid;gap:0;border-left:1px solid var(--line);margin-left:6px}
+.t-item{position:relative;display:grid;grid-template-columns:200px minmax(0,1fr);gap:8px 32px;padding:0 0 36px 28px}
+.t-item::before{content:"";position:absolute;left:-6px;top:6px;width:11px;height:11px;border-radius:50%;background:var(--bg);border:2px solid var(--accent)}
+.t-item:not(:first-child)::before{border-color:var(--muted)}
+.t-meta{display:grid;gap:4px;align-content:start}
+.t-meta .when{font:500 .78rem var(--f-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.t-meta h3{font-size:1.2rem;font-weight:650}
+.t-meta span{color:var(--muted);font-size:.9rem}
+.t-body ul{margin:0;padding-left:18px;display:grid;gap:8px;color:var(--muted);max-width:66ch}
+.t-body li::marker{color:var(--accent)}
+.t-body b{color:var(--ink);font-weight:500}
+
+/* stack */
+.stack{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.stack .group{border:1px solid var(--line);border-radius:14px;padding:18px;background:var(--surface);display:grid;gap:12px;align-content:start}
+.stack .group .chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font:500 .82rem/1 var(--f-sans);padding:8px 10px;border-radius:8px;background:var(--surface-2);border:1px solid var(--line)}
+
+/* outside */
+.outside{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
+.repo-list{display:grid;gap:0}
+.repo{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);text-decoration:none}
+.repo:last-child{border-bottom:0}
+.repo:hover .rn{color:var(--accent)}
+.rn{font:500 .92rem var(--f-mono)}
+.rd{color:var(--muted);font-size:.85rem}
+.lang{font:400 .75rem var(--f-mono);color:var(--muted);display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.lang::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--accent-2)}
+.bars{display:grid;gap:12px}
+.bar{display:grid;grid-template-columns:90px minmax(0,1fr) 36px;align-items:center;gap:12px;font:400 .82rem var(--f-mono);color:var(--muted)}
+.bar div{height:8px;border-radius:99px;background:var(--surface-2);overflow:hidden}
+.bar div i{display:block;height:100%;border-radius:inherit;background:var(--accent)}
+.bar span:last-child{text-align:right;color:var(--ink);font-variant-numeric:tabular-nums}
+
+
+/* projects */
+.projects{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:14px}
+.proj-side{display:grid;gap:14px;align-content:start}
+.proj{text-decoration:none;color:inherit}
+.proj h3{font-size:1.35rem}
+.proj.feature h3{font-size:1.7rem}
+.feat{margin:0;padding-left:18px;display:grid;gap:6px;color:var(--muted);font-size:.93rem}
+.feat li::marker{color:var(--accent)}
+.feat b{color:var(--ink);font-weight:500}
+.go{font:500 .8rem/1 var(--f-mono);color:var(--accent)}
+@media (max-width:900px){.projects{grid-template-columns:1fr}}
+
+/* contact */
+.contact{border:1px solid var(--line);border-radius:22px;padding:clamp(28px,5vw,56px);background:radial-gradient(600px 240px at 100% 0,var(--glow),transparent 70%),var(--surface);display:grid;gap:22px}
+.contact h2{font-size:clamp(2rem,5vw,3.4rem);font-weight:800;max-width:18ch}
+.email-row{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.email-row code{font:500 1.05rem var(--f-mono);padding:12px 14px;border-radius:10px;background:var(--bg-2);border:1px solid var(--line);user-select:all;overflow-wrap:anywhere}
+footer{display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;padding-block:32px 48px;color:var(--muted);font:400 .8rem var(--f-mono)}
+
+@media (max-width:900px){
+  .hero{grid-template-columns:1fr}
+  .c-a,.c-b,.c-c,.c-d,.c-e,.c-f,.c-g{grid-column:span 3}
+  .c-a{grid-column:span 6}
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .stat:nth-child(2){border-right:0}.stat:nth-child(-n+2){border-bottom:1px solid var(--line)}
+  .outside{grid-template-columns:1fr}
+}
+@media (max-width:620px){
+  .c-a,.c-b,.c-c,.c-d,.c-e,.c-f,.c-g{grid-column:span 6}
+  .t-item{grid-template-columns:1fr}
+  .nav a:not(.brand):nth-child(n+5){display:none}
+}
+@media (prefers-reduced-motion:reduce){
+  .scene,.scene.leaving{transform:none}
+  .scene{transition:opacity .4s!important}
+  *:not(.scene){animation:none!important;transition:none!important}
+  .flow svg .anim{display:none}
+  html{scroll-behavior:auto}
+}
+</style>
+</head>
+<body>
+
+
+<nav class="nav" aria-label="Sections">
+  <div class="nav-inner">
+    <a class="brand" href="#top">ys/</a>
+    <a href="#work">Work</a>
+    <a href="#experience">Experience</a>
+    <a href="#stack">Stack</a>
+    <a href="#outside">Projects</a>
+    <a href="/writing/">Writing</a>
+    <a href="#contact">Contact</a>
+  </div>
+</nav>
+
+<main id="top">
+  <div class="wrap">
+    <header class="hero">
+      <div class="hero-copy">
+        <span class="pill"><i></i>SDE 2 at Prismforce · Bengaluru</span>
+        <h1>Yash<br><span class="grad">Shrivastava</span></h1>
+        <p class="lede">Software engineer with 6+ years of experience. I build <b>event-driven systems that don't break</b>: queues, workers, locks and the platforms around them, running on AWS and Kubernetes.</p>
+        <div class="ctas">
+          <a class="btn primary" href="#contact">Get in touch</a>
+          <a class="btn" href="https://github.com/YashS96"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>GitHub</a>
+          <a class="btn" href="https://linkedin.com/in/YashS96"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M0 1.15C0 .52.52 0 1.17 0h13.66C15.48 0 16 .52 16 1.15v13.7c0 .63-.52 1.15-1.17 1.15H1.17C.52 16 0 15.48 0 14.85V1.15zm4.94 12.24V6.17H2.54v7.22h2.4zM3.74 5.18c.84 0 1.36-.55 1.36-1.25-.02-.71-.52-1.25-1.34-1.25-.82 0-1.36.54-1.36 1.25 0 .7.52 1.25 1.33 1.25h.01zm4.91 8.21V9.36c0-.22.02-.43.08-.59.17-.43.57-.88 1.23-.88.87 0 1.22.66 1.22 1.64v3.86h2.4V9.25c0-2.22-1.18-3.25-2.76-3.25-1.27 0-1.84.7-2.16 1.19v.03h-.02l.02-.03V6.17h-2.4c.03.68 0 7.22 0 7.22h2.4z"/></svg>LinkedIn</a>
+        </div>
+      </div>
+
+      <figure class="flow" id="patterns" aria-label="Rotating diagrams of architecture patterns: SNS to SQS fan-out, transactional outbox with a relay, Redis distributed lock, and monolith to event-driven services.">
+        <div class="flow-head"><div class="dots"><i></i><i></i><i></i></div><span class="label" id="pat-label">patterns/outbox-relay</span></div>
+        <div class="progress" aria-hidden="true"><i id="pat-progress"></i></div>
+
+        <div class="stage">
+          <svg class="scene active" data-scene="outbox" viewBox="0 0 420 230" aria-hidden="true">
+            <path id="o1" class="edge" d="M90 115 C112 115 110 88 132 88"/>
+            <path id="o2" class="edge" d="M90 115 C112 115 110 148 132 148"/>
+            <path id="o3" class="edge" d="M228 148 H262"/>
+            <path id="o4" class="edge" d="M322 148 H342"/>
+            <path id="o5" class="edge" d="M377 130 V92"/>
+            <path id="o6" class="edge" d="M262 160 H228"/>
+            <rect class="node" x="14" y="95" width="76" height="40" rx="8"/><text x="26" y="119">service</text>
+            <rect class="tx" x="120" y="40" width="120" height="146" rx="10"/>
+            <text class="say acc" data-show="0,0.3" x="128" y="58">BEGIN … COMMIT</text>
+            <rect class="inner" x="132" y="70" width="96" height="36" rx="6"/><text x="160" y="92">orders</text>
+            <rect class="q" x="132" y="130" width="96" height="36" rx="6"/><text class="strong" x="158" y="152">outbox</text>
+            <rect class="pod" x="262" y="130" width="60" height="36" rx="8"/><text x="274" y="152">relay</text>
+            <rect class="q" x="342" y="130" width="70" height="36" rx="8"/><text x="350" y="152">SNS/SQS</text>
+            <rect class="pod" x="342" y="60" width="70" height="32" rx="8"/><text x="348" y="80">consumers</text>
+            <text class="say" data-show="0.3,0.55" x="236" y="124" style="fill:var(--muted)">poll</text>
+            <text class="say ok" data-show="0.82,1" x="238" y="190">mark sent</text>
+            <text x="14" y="222">one transaction · at-least-once publish</text>
+          </svg>
+
+          <svg class="scene" data-scene="fanout" viewBox="0 0 420 230" aria-hidden="true">
+            <path id="f0" class="edge" d="M90 115 H150"/>
+            <path id="f1" class="edge" d="M220 115 C236 115 234 45 250 45"/>
+            <path id="f2" class="edge" d="M220 115 H250"/>
+            <path id="f3" class="edge" d="M220 115 C236 115 234 185 250 185"/>
+            <path id="g1" class="edge" d="M320 45 H348"/>
+            <path id="g2" class="edge" d="M320 115 H348"/>
+            <path id="g3" class="edge" d="M320 185 H348"/>
+            <rect class="node" x="14" y="95" width="76" height="40" rx="8"/><text x="24" y="119">producer</text>
+            <rect class="q" x="150" y="88" width="70" height="54" rx="8"/><text class="strong" x="172" y="111">SNS</text><text x="166" y="127">topic</text>
+            <rect class="q" x="250" y="30" width="70" height="30" rx="7"/><text x="262" y="49">SQS · a</text>
+            <rect class="q" x="250" y="100" width="70" height="30" rx="7"/><text x="262" y="119">SQS · b</text>
+            <rect class="q" x="250" y="170" width="70" height="30" rx="7"/><text x="262" y="189">SQS · c</text>
+            <rect class="pod" x="348" y="30" width="60" height="30" rx="7"/><text x="360" y="49">email</text>
+            <rect class="pod" x="348" y="100" width="60" height="30" rx="7"/><text x="360" y="119">in-app</text>
+            <rect class="pod" x="348" y="170" width="60" height="30" rx="7"/><text x="360" y="189">audit</text>
+            <text class="say acc" data-show="0.28,0.95" x="150" y="80">publish ×1</text>
+            <text class="say ok" data-show="0.6,0.95" x="250" y="222">delivered ×3</text>
+          </svg>
+
+          <svg class="scene" data-scene="keda" viewBox="0 0 420 230" aria-hidden="true">
+            <path id="k1" class="edge" d="M130 96 C150 96 150 37 170 37"/>
+            <path id="k2" class="edge" d="M260 37 C284 37 284 76 300 76"/>
+            <path id="q1" class="edge" d="M130 110 C210 110 230 76 300 76"/>
+            <path id="q2" class="edge" d="M130 110 C210 110 230 126 300 126"/>
+            <path id="q3" class="edge" d="M130 110 C210 110 230 176 300 176"/>
+            <rect class="q" x="20" y="72" width="110" height="76" rx="8"/><text class="strong" x="32" y="92">SQS</text><text x="72" y="92">depth</text>
+            <rect class="pk-bar" data-show="0.02,0.86" x="32" y="104" width="14" height="30" rx="3"/>
+            <rect class="pk-bar" data-show="0.07,0.8" x="50" y="104" width="14" height="30" rx="3"/>
+            <rect class="pk-bar" data-show="0.12,0.74" x="68" y="104" width="14" height="30" rx="3"/>
+            <rect class="pk-bar" data-show="0.17,0.68" x="86" y="104" width="14" height="30" rx="3"/>
+            <rect class="pk-bar" data-show="0.22,0.62" x="104" y="104" width="14" height="30" rx="3"/>
+            <rect class="node" x="170" y="20" width="90" height="34" rx="8"/><text class="strong" x="196" y="41">KEDA</text>
+            <text class="say acc" data-show="0.2,0.45" x="150" y="72">queueLength</text>
+            <rect class="pod" x="300" y="60" width="96" height="32" rx="8"/><text x="312" y="80">pod 1</text>
+            <g class="say" data-show="0.34,0.94"><rect class="pod" x="300" y="110" width="96" height="32" rx="8"/><text x="312" y="130">pod 2</text></g>
+            <g class="say" data-show="0.39,0.94"><rect class="pod" x="300" y="160" width="96" height="32" rx="8"/><text x="312" y="180">pod 3</text></g>
+            <text class="say ok" data-show="0.34,0.94" x="350" y="80">+2</text>
+            <text x="14" y="222">replicas follow queue depth · scale in when drained</text>
+          </svg>
+
+          <svg class="scene" data-scene="lock" viewBox="0 0 420 230" aria-hidden="true">
+            <path id="l1" class="edge" d="M94 58 C132 58 136 105 170 105"/>
+            <path id="l2" class="edge" d="M94 168 C132 168 136 125 170 125"/>
+            <path id="l3" class="edge" d="M94 48 C170 14 290 14 330 52"/>
+            <rect class="node" x="14" y="40" width="80" height="36" rx="8"/><text x="24" y="62">worker A</text>
+            <rect class="node" x="14" y="150" width="80" height="36" rx="8"/><text x="24" y="172">worker B</text>
+            <rect class="q" x="170" y="88" width="104" height="54" rx="8"/><text class="strong" x="200" y="111">Redis</text><text x="186" y="128">lock:e42</text>
+            <rect class="inner" x="330" y="40" width="78" height="36" rx="8"/><text x="344" y="62">entity</text>
+            <text class="say ok" data-show="0.4,0.9" x="100" y="96">OK · owner</text>
+            <text class="say err" data-show="0.4,0.9" x="100" y="146">nil · retry</text>
+            <text class="say acc" data-show="0.25,0.9" x="186" y="160">held · TTL 5s</text>
+            <text class="say" data-show="0.55,0.75" x="190" y="34" style="fill:var(--ink)">write</text>
+            <text class="say ok" data-show="0.9,1" x="186" y="160">released</text>
+            <text x="14" y="222">SET lock:e42 {owner} NX PX 5000</text>
+          </svg>
+
+          <svg class="scene" data-scene="saga" viewBox="0 0 420 230" aria-hidden="true">
+            <path id="w1" class="edge" d="M210 56 C210 90 70 88 70 120"/>
+            <path id="w2" class="edge" d="M210 56 V120"/>
+            <path id="w3" class="edge" d="M210 56 C210 90 350 88 350 120"/>
+            <rect class="q" x="140" y="20" width="140" height="36" rx="8"/><text class="strong" x="152" y="42">Temporal workflow</text>
+            <rect class="node" x="20" y="120" width="100" height="36" rx="8"/><text x="34" y="142">activity A</text>
+            <rect class="node" x="160" y="120" width="100" height="36" rx="8"/><text x="174" y="142">activity B</text>
+            <rect class="node" x="300" y="120" width="100" height="36" rx="8"/><text x="314" y="142">activity C</text>
+            <text class="say ok" data-show="0.22,0.8" x="34" y="176">done</text>
+            <text class="say ok" data-show="0.47,0.8" x="174" y="176">done</text>
+            <text class="say err" data-show="0.66,1" x="314" y="176">failed</text>
+            <text class="say acc" data-show="0.8,1" x="174" y="176">undo</text>
+            <text class="say acc" data-show="0.92,1" x="34" y="176">undo</text>
+            <text x="14" y="222">durable retries · compensate in reverse on failure</text>
+          </svg>
+
+          <svg class="scene" data-scene="idem" viewBox="0 0 420 230" aria-hidden="true">
+            <path id="d1" class="edge" d="M94 110 H150"/>
+            <path id="d2" class="edge" d="M236 104 C262 104 262 47 290 47"/>
+            <path id="d3" class="edge" d="M236 116 C262 116 262 131 290 131"/>
+            <path id="d4" class="edge" d="M193 130 V172"/>
+            <rect class="q" x="14" y="90" width="80" height="40" rx="8"/><text class="strong" x="38" y="114">SQS</text>
+            <rect class="pod" x="150" y="90" width="86" height="40" rx="8"/><text x="160" y="114">consumer</text>
+            <rect class="inner" x="290" y="30" width="118" height="34" rx="8"/><text x="302" y="51">idempotency keys</text>
+            <rect class="inner" x="290" y="114" width="118" height="34" rx="8"/><text x="334" y="135">db</text>
+            <rect class="bad" x="150" y="172" width="86" height="34" rx="8"/><text class="strong" x="180" y="193">DLQ</text>
+            <text class="say ok" data-show="0.3,0.48" x="296" y="84">new · apply</text>
+            <text class="say err" data-show="0.72,0.84" x="296" y="84">seen · skip</text>
+            <text class="say err" data-show="0.84,1" x="244" y="193">poison after N retries</text>
+          </svg>
+
+          <svg class="scene" data-scene="split" viewBox="0 0 420 230" aria-hidden="true">
+            <path id="m1" class="edge" d="M211 70 V100"/>
+            <path id="m2" class="edge" d="M211 115 H375"/>
+            <path id="m3" class="edge" d="M293 100 V70"/>
+            <path id="m4" class="edge" d="M375 100 V70"/>
+            <rect class="node" x="14" y="36" width="110" height="154" rx="10"/><text x="24" y="56">monolith</text>
+            <rect class="inner" x="26" y="68" width="86" height="28" rx="6"/><text x="38" y="86">auth</text>
+            <rect class="inner" x="26" y="104" width="86" height="28" rx="6"/><text x="38" y="122">notify</text>
+            <rect class="inner" x="26" y="140" width="86" height="28" rx="6"/><text x="38" y="158">users</text>
+            <text class="big" x="138" y="122">→</text>
+            <rect class="pod" x="178" y="36" width="66" height="34" rx="8"/><text x="194" y="57">auth</text>
+            <rect class="pod" x="260" y="36" width="66" height="34" rx="8"/><text x="272" y="57">notify</text>
+            <rect class="pod" x="342" y="36" width="66" height="34" rx="8"/><text x="356" y="57">users</text>
+            <rect class="q" x="178" y="100" width="230" height="30" rx="8"/><text class="strong" x="244" y="119">SNS / SQS events</text>
+            <rect class="inner" x="178" y="150" width="66" height="28" rx="6"/><text x="196" y="168">db</text>
+            <rect class="inner" x="260" y="150" width="66" height="28" rx="6"/><text x="278" y="168">db</text>
+            <rect class="inner" x="342" y="150" width="66" height="28" rx="6"/><text x="360" y="168">db</text>
+            <text x="14" y="222">sync HTTP calls → async events · 3× scale</text>
+          </svg>
+        </div>
+
+        <div class="caption" aria-live="polite">
+          <h3 id="pat-title">Transactional outbox + relay</h3>
+          <p id="pat-desc">State and event commit in one transaction. A relay pod polls the outbox and publishes, so events are never lost or sent for rolled-back writes.</p>
+        </div>
+        <div class="steps" aria-hidden="true">
+          <span class="on">Outbox</span><span>Fan-out</span><span>Autoscaling</span><span>Lock</span><span>Saga</span><span>Idempotency</span><span>Decomposition</span>
+        </div>
+      </figure>
+    </header>
+
+    <div class="stats" role="list">
+      <div class="stat" role="listitem"><b>1.2<span>M</span></b><small>users on the event-driven platform</small></div>
+      <div class="stat" role="listitem"><b>3<span>×</span></b><small>scale after moving off monolithic HTTP</small></div>
+      <div class="stat" role="listitem"><b>600</b><small>planner sites across 8 time zones, up from 17</small></div>
+      <div class="stat" role="listitem"><b>92<span>%</span></b><small>accuracy on AI resume classification</small></div>
+    </div>
+
+    <section id="work" aria-labelledby="work-h">
+      <div class="sec-head">
+        <h2 id="work-h">Systems I've shipped</h2>
+        <p>At Prismforce I work on SkillPrism, an enterprise workforce-intelligence platform, and own the notification pipeline and specializations domains end to end.</p>
+      </div>
+
+      <div class="bento">
+        <article class="card c-a">
+          <div class="k"><span class="label">Architecture</span><span class="tag">Prismforce</span></div>
+          <h3>Monolith to event-driven, with outbox + relay</h3>
+          <p>Re-engineered legacy HTTP services into SQS/SNS-based services. A transactional outbox with a dedicated relay pod keeps database writes and published events consistent, which let the platform scale 3× to 1M–1.2M users across enterprise clients.</p>
+          <div class="tags"><span class="tag">SQS</span><span class="tag">SNS</span><span class="tag">Outbox + relay</span><span class="tag">PostgreSQL</span><span class="tag">MongoDB</span></div>
+        </article>
+
+        <article class="card c-b">
+          <span class="label">Reliability</span>
+          <span class="big">99%</span>
+          <h3>SNS → SQS fan-out</h3>
+          <p>One publish, many independent queues and consumers. No message loss across components; KEDA scales workers on queue depth.</p>
+          <div class="tags"><span class="tag">KEDA</span><span class="tag">EKS</span></div>
+        </article>
+
+        <article class="card c-c">
+          <span class="label">Concurrency</span>
+          <h3>Distributed locks on Redis</h3>
+          <pre class="code"><span class="kw">SET</span> lock:entity:<span class="st">{id}</span> <span class="st">{owner}</span>
+    <span class="kw">NX PX</span> 5000
+<span class="cm"># atomic acquire, bounded TTL</span></pre>
+          <p>Stops races in concurrent entity CRUD flows; locks expire on their own if a holder dies.</p>
+        </article>
+
+        <article class="card c-d">
+          <span class="label">Identity</span>
+          <h3>Enterprise SSO</h3>
+          <p>Auth service on Auth0 with SAML2 and OAuth 2.0. Google SSO and Active Directory unlocked institutional clients.</p>
+          <div class="tags"><span class="tag">Auth0</span><span class="tag">SAML2</span><span class="tag">OAuth 2.0</span></div>
+        </article>
+
+        <article class="card c-e">
+          <span class="label">Applied AI</span>
+          <span class="big">92%</span>
+          <h3>Resume parsing</h3>
+          <p>OpenAI-based extraction of structured candidate data, with staffing-role recommendations.</p>
+          <div class="tags"><span class="tag">OpenAI</span><span class="tag">Python</span></div>
+        </article>
+
+        <article class="card c-f">
+          <div class="k"><span class="label">Scale-out</span><span class="tag">Deloitte</span></div>
+          <h3>17 → 600 planner sites</h3>
+          <div class="ladder" aria-hidden="true"><i style="height:8%"></i><i style="height:18%"></i><i style="height:34%"></i><i style="height:56%"></i><i style="height:78%"></i><i style="height:100%"></i></div>
+          <p>Scaled backend infrastructure across 8 time zones for a 300% user-base increase. Real-time pushes over GraphQL and WebSockets; load time cut below 5 s.</p>
+        </article>
+
+        <article class="card c-g">
+          <span class="label">Team</span>
+          <h3>Mentoring and ownership</h3>
+          <p>Lead and mentor junior engineers through code reviews, technical direction and delivery ownership, raising both team throughput and code quality.</p>
+          <div class="tags"><span class="tag">Code review</span><span class="tag">Hexagonal architecture</span><span class="tag">Clean code</span></div>
+        </article>
+      </div>
+    </section>
+
+    <section id="experience" aria-labelledby="exp-h">
+      <div class="sec-head"><h2 id="exp-h">Experience</h2><span class="label">2018 → now</span></div>
+      <div class="timeline">
+        <div class="t-item">
+          <div class="t-meta"><span class="when">Sep 2024 — Present</span><h3>Prismforce</h3><span>SDE 2</span></div>
+          <div class="t-body"><ul>
+            <li><b>Event-driven re-architecture</b> with SQS/SNS and the outbox pattern, scaling 3× to 1M–1.2M users.</li>
+            <li><b>Notification pipeline</b> with no message loss and KEDA autoscaling.</li>
+            <li><b>Auth service</b> with SAML2/OAuth 2.0, Google SSO and Active Directory.</li>
+            <li><b>Redis distributed locking</b>, AI resume parsing, and mentoring junior engineers.</li>
+          </ul></div>
+        </div>
+        <div class="t-item">
+          <div class="t-meta"><span class="when">Sep 2020 — Sep 2024</span><h3>Deloitte</h3><span>Consultant, Senior Software Engineer</span></div>
+          <div class="t-body"><ul>
+            <li><b>Scaled a planner platform</b> from 17 to 600 sites across 8 time zones, a 300% user-base increase.</li>
+            <li><b>REST, GraphQL and WebSocket APIs</b> for real-time push notifications.</li>
+            <li><b>Performance work</b> bringing load time under 5 s, a 20% efficiency gain.</li>
+          </ul></div>
+        </div>
+        <div class="t-item">
+          <div class="t-meta"><span class="when">Jun — Jul 2018</span><h3>MP Forest Department</h3><span>SDE Intern</span></div>
+          <div class="t-body"><ul><li>Leave Management System for the IT Wing, cutting manual paperwork by 50%.</li></ul></div>
+        </div>
+        <div class="t-item">
+          <div class="t-meta"><span class="when">2016 — 2020</span><h3>Manipal Institute of Technology</h3><span>B.Tech, Computer and Communications Engg.</span></div>
+          <div class="t-body"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="stack" aria-labelledby="stack-h">
+      <div class="sec-head"><h2 id="stack-h">Stack</h2><p>What I reach for day to day.</p></div>
+      <div class="stack">
+        <div class="group"><span class="label">Languages &amp; runtimes</span><div class="chips"><span class="chip">TypeScript</span><span class="chip">Python</span><span class="chip">JavaScript</span><span class="chip">Node.js</span><span class="chip">Bun</span></div></div>
+        <div class="group"><span class="label">Frameworks</span><div class="chips"><span class="chip">Elysia</span><span class="chip">Express</span><span class="chip">FastAPI</span><span class="chip">Drizzle ORM</span></div></div>
+        <div class="group"><span class="label">Data</span><div class="chips"><span class="chip">PostgreSQL</span><span class="chip">MongoDB</span><span class="chip">Redis</span><span class="chip">DynamoDB</span></div></div>
+        <div class="group"><span class="label">AWS</span><div class="chips"><span class="chip">SQS</span><span class="chip">SNS</span><span class="chip">EventBridge</span><span class="chip">Lambda</span><span class="chip">EKS</span><span class="chip">ECS</span><span class="chip">S3</span><span class="chip">API Gateway</span></div></div>
+        <div class="group"><span class="label">Orchestration</span><div class="chips"><span class="chip">Temporal</span><span class="chip">Argo Workflows</span><span class="chip">Step Functions</span></div></div>
+        <div class="group"><span class="label">Platform &amp; delivery</span><div class="chips"><span class="chip">Kubernetes</span><span class="chip">Docker</span><span class="chip">Helm</span><span class="chip">ArgoCD</span><span class="chip">KEDA</span><span class="chip">Traefik</span></div></div>
+        <div class="group"><span class="label">Observability</span><div class="chips"><span class="chip">OpenTelemetry</span><span class="chip">Grafana</span><span class="chip">Coralogix</span><span class="chip">CloudWatch</span></div></div>
+        <div class="group"><span class="label">APIs</span><div class="chips"><span class="chip">REST</span><span class="chip">GraphQL</span><span class="chip">WebSockets</span></div></div>
+      </div>
+    </section>
+
+    <section id="outside" aria-labelledby="out-h">
+      <div class="sec-head"><h2 id="out-h">Personal projects</h2><p>Things I build on my own time. The code is public on GitHub.</p></div>
+      <div class="projects">
+        <a class="card proj feature" href="https://github.com/YashS96/authN">
+          <div class="k"><span class="label">Featured · authentication service</span><span class="tag">MIT</span></div>
+          <h3>authN</h3>
+          <p>A centralized authentication service built on hexagonal architecture. The core domain has no framework dependencies; HTTP, PostgreSQL and Redis sit behind ports and adapters.</p>
+          <ul class="feat">
+            <li>Email/password with <b>Argon2id</b> hashing</li>
+            <li><b>OAuth 2.0</b> for Google, GitHub and Apple, with state-token CSRF protection</li>
+            <li><b>JWT</b> access and refresh tokens with configurable TTLs</li>
+            <li><b>Redis</b> sessions with automatic expiry</li>
+          </ul>
+          <pre class="code">src/
+├── core/        <span class="cm"># framework-agnostic</span>
+│   ├── domain/  <span class="cm"># entities, types</span>
+│   ├── ports/   <span class="cm"># interfaces</span>
+│   └── services/
+└── adapters/
+    ├── inbound/  <span class="cm"># HTTP routes</span>
+    └── outbound/ <span class="cm"># Postgres, Redis, OAuth</span></pre>
+          <div class="tags"><span class="tag">Bun</span><span class="tag">TypeScript</span><span class="tag">PostgreSQL</span><span class="tag">Redis</span><span class="tag">Hexagonal</span></div>
+          <span class="go">View repository ↗</span>
+        </a>
+        <div class="proj-side">
+          <a class="card proj" href="https://github.com/YashS96/ContentAggregator">
+            <span class="label">Full-stack · news aggregation</span>
+            <h3>ContentAggregator</h3>
+            <p>An RSS aggregator for NDTV, BBC and The Hindu. Express API in MVC layers, OAuth login via Passport, Node cluster mode for throughput, Winston logging, and Mocha/Chai tests.</p>
+            <div class="tags"><span class="tag">Node.js</span><span class="tag">Express</span><span class="tag">React</span><span class="tag">MongoDB</span></div>
+            <span class="go">View repository ↗</span>
+          </a>
+          <a class="card proj" href="https://github.com/YashS96/DSA">
+            <span class="label">Algorithms</span>
+            <h3>DSA</h3>
+            <p>Data structures and algorithms implemented from first principles: linked lists, stacks, queues, sorting, binary search and number theory.</p>
+            <div class="tags"><span class="tag">JavaScript</span><span class="tag">128 solved on LeetCode</span></div>
+            <span class="go">View repository ↗</span>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <section id="contact" aria-labelledby="contact-h">
+      <div class="contact">
+        <span class="label">Contact</span>
+        <h2 id="contact-h">Open to conversations on backend and distributed systems.</h2>
+        <div class="email-row">
+          <code id="email">srivastavyash7@gmail.com</code>
+          <button class="btn" id="copy-btn" type="button">Copy email</button>
+        </div>
+        <div class="ctas">
+          <a class="btn" href="https://linkedin.com/in/YashS96">LinkedIn ↗</a>
+          <a class="btn" href="https://github.com/YashS96">GitHub ↗</a>
+          <a class="btn" href="https://leetcode.com/shy053">LeetCode ↗</a>
+        </div>
+      </div>
+    </section>
+
+    <footer><span>© 2026 Yash Shrivastava</span><span>Bengaluru, India</span></footer>
+  </div>
+</main>
+
+<script>
+(function(){
+  const btn=document.getElementById('copy-btn'), el=document.getElementById('email');
+  btn.addEventListener('click',()=>{
+    const done=()=>{btn.textContent='Copied';setTimeout(()=>btn.textContent='Copy email',1600)};
+    const fallback=()=>{const r=document.createRange();r.selectNodeContents(el);const s=getSelection();s.removeAllRanges();s.addRange(r);btn.textContent='Selected'};
+    try{navigator.clipboard.writeText(el.textContent.trim()).then(done,fallback)}catch(e){fallback()}
+  });
+  document.querySelectorAll('.card').forEach(c=>c.addEventListener('pointermove',e=>{
+    const r=c.getBoundingClientRect();c.style.setProperty('--mx',(e.clientX-r.left)+'px');c.style.setProperty('--my',(e.clientY-r.top)+'px');
+  }));
+})();
+
+(function(){
+  const fig=document.getElementById('patterns'); if(!fig) return;
+  const scenes=[...fig.querySelectorAll('.scene')];
+  const steps=[...fig.querySelectorAll('.steps span')];
+  const title=document.getElementById('pat-title'), desc=document.getElementById('pat-desc');
+  const label=document.getElementById('pat-label'), bar=document.getElementById('pat-progress');
+  const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const CYCLE=3000, DWELL=CYCLE, NS='http://www.w3.org/2000/svg';
+  const META=[
+    {slug:'outbox-relay',t:'Transactional outbox + relay',d:'State and event commit in one transaction. A relay pod polls the outbox and publishes, so events are never lost or sent for rolled-back writes.',
+     pk:[['o1',0,.2,'msg2'],['o2',0,.2,'msg2'],['o3',.32,.5,'msg'],['o4',.55,.65,'msg'],['o5',.66,.8,'msg'],['o6',.82,.95,'ok']]},
+    {slug:'fan-out',t:'Fan-out: SNS → SQS',d:'One publish reaches many independent queues. Each consumer scales, retries and fails on its own.',
+     pk:[['f0',0,.25,'msg'],['f1',.3,.55,'msg'],['f2',.3,.55,'msg'],['f3',.3,.55,'msg'],['g1',.6,.8,'ok'],['g2',.62,.82,'ok'],['g3',.64,.84,'ok']]},
+    {slug:'queue-autoscaling',t:'Queue-driven autoscaling with KEDA',d:'KEDA reads queue depth and scales worker pods to match, then scales back in once the backlog drains.',
+     pk:[['k1',.14,.3,'msg2'],['k2',.3,.4,'msg2'],['q1',.44,.58,'msg'],['q2',.48,.62,'msg'],['q3',.52,.66,'msg'],['q1',.64,.78,'msg'],['q2',.68,.82,'msg']]},
+    {slug:'distributed-lock',t:'Distributed lock on Redis',d:'SET NX PX lets exactly one worker own an entity. The TTL frees the lock if the holder crashes, so nothing deadlocks.',
+     pk:[['l1',0,.2,'msg'],['l2',.04,.24,'msg2'],['l1',.26,.4,'ok',1],['l2',.26,.4,'err',1],['l3',.5,.72,'msg'],['l1',.78,.9,'msg']]},
+    {slug:'saga',t:'Saga orchestration with Temporal',d:'A durable workflow runs each step with retries. If a step fails for good, completed steps are compensated in reverse.',
+     pk:[['w1',0,.12,'msg'],['w1',.12,.2,'ok',1],['w2',.24,.36,'msg'],['w2',.36,.45,'ok',1],['w3',.49,.6,'msg'],['w3',.6,.66,'err',1],['w2',.7,.8,'msg2'],['w1',.82,.92,'msg2']]},
+    {slug:'idempotent-consumer',t:'Idempotent consumer + DLQ',d:'At-least-once delivery means duplicates. Consumers check an idempotency key before applying; poison messages land in a dead-letter queue.',
+     pk:[['d1',0,.14,'msg'],['d2',.14,.24,'msg'],['d2',.24,.3,'ok',1],['d3',.32,.44,'ok'],['d1',.5,.62,'msg2'],['d2',.62,.7,'msg2'],['d2',.7,.76,'err',1],['d4',.84,.96,'err']]},
+    {slug:'decomposition',t:'Monolith → event-driven services',d:'Split by domain, give each service its own data, and replace synchronous HTTP calls with events.',
+     pk:[['m1',0,.2,'msg'],['m2',.2,.45,'msg'],['m3',.45,.65,'ok'],['m4',.47,.67,'ok'],['m4',.72,.86,'msg2',1],['m2',.86,1,'msg2',1]]}
+  ];
+  // build packet circles
+  const state=scenes.map((svg,i)=>{
+    const items=META[i].pk.map(([id,a,b,cls,rev])=>{
+      const path=svg.querySelector('#'+id); const c=document.createElementNS(NS,'circle');
+      c.setAttribute('r','4.2'); c.setAttribute('class','pk '+cls); svg.appendChild(c);
+      return {path,len:path.getTotalLength(),a,b,c,rev:!!rev};
+    });
+    const says=[...svg.querySelectorAll('[data-show]')].map(el=>{const [a,b]=el.dataset.show.split(',').map(Number);return {el,a,b}});
+    return {items,says};
+  });
+  function frame(i,t){
+    const st=state[i];
+    for(const p of st.items){
+      if(t>=p.a&&t<=p.b){const k=(t-p.a)/(p.b-p.a), pt=p.path.getPointAtLength((p.rev?1-k:k)*p.len);
+        p.c.setAttribute('cx',pt.x);p.c.setAttribute('cy',pt.y);p.c.style.opacity=1;}
+      else p.c.style.opacity=0;
+    }
+    for(const s of st.says) s.el.style.opacity=(t>=s.a&&t<=s.b)?1:0;
+  }
+  let cur=0, start=performance.now(), paused=false, pausedAt=0;
+  function show(i){
+    if(i===cur) return;
+    scenes[cur].classList.remove('active'); scenes[cur].classList.add('leaving');
+    const prev=cur; setTimeout(()=>scenes[prev].classList.remove('leaving'),450);
+    cur=i; scenes[cur].classList.add('active');
+    steps.forEach((el,k)=>el.classList.toggle('on',k===cur));
+    title.textContent=META[cur].t; desc.textContent=META[cur].d; label.textContent='patterns/'+META[cur].slug;
+    start=performance.now(); if(reduce) frame(cur,.45);
+  }
+  if(reduce){ scenes.forEach((_,i)=>frame(i,.45)); setInterval(()=>show((cur+1)%scenes.length),3200); return; }
+  const pause=()=>{if(!paused){paused=true;pausedAt=performance.now()}};
+  const resume=()=>{if(paused){start+=performance.now()-pausedAt;paused=false}};
+  document.addEventListener('visibilitychange',()=>document.hidden?pause():resume());
+  function tick(now){
+    if(!paused){
+      const el=now-start;
+      if(el>=DWELL){ show((cur+1)%scenes.length); }
+      else { frame(cur,(el%CYCLE)/CYCLE); bar.style.width=(el/DWELL*100)+'%'; }
+    }
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+})();
+</script>
+
+</body>
+</html>

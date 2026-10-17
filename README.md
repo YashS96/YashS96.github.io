@@ -33,3 +33,7 @@ npm run preview   # serve dist/ locally
 Repo **Settings → Pages → Build and deployment → Source: GitHub Actions**.
 
 For a project repo (not `YashS96.github.io`), set `base: '/<repo-name>'` in `astro.config.mjs`.
+
+## Note on the root `index.html`
+
+`public/index.html` is the portfolio page Astro serves at `/`. A copy also sits at the repo root so the site keeps working while Pages is still set to "Deploy from a branch". Once Pages uses **GitHub Actions**, edit `public/index.html` and delete the root copy and root `.nojekyll`.
