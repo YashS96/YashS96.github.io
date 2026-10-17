@@ -1,0 +1,83 @@
+---
+title: "How Filesystems Actually Work: From read()/fs.readFile() to the Disk"
+subtitle: "One read()/fs.readFile() call, followed from your code through the kernel and down to the disk."
+date: 2026-10-17
+series: "Storage from the ground up"
+part: 1
+readingTime: "7 min read"
+tags: ["filesystems", "linux", "node.js", "xfs", "system design"]
+---
+
+import Diagram from '../../components/Diagram.astro';
+
+I use S3 every day, I use it nonchalantly and often overlook the engineering behind it, so I wanted to get to the bottom of it and understand the interactions that take place there.
+
+It turns out you can't really understand S3 without first understanding the thing it replaces: the filesystem. So this is a two-part trip. This part follows a single read from a line of application code, through the operating system, down to the disk. [Part 2](../how-object-storage-works/) takes the same ideas out over the network and into S3.
+
+## How it happens:
+
+<Diagram name="p1-01-map" alt="One read from your code to the disk" />
+
+## 1. Down the stack: what really happens when you call `read()` [Python] or `fs.readFile()` [Node]
+
+Let's start with the most ordinary thing a program does: read/write a file. Underneath, the disk has no idea what a file is. It offers a long row of numbered 4 KB blocks and will read or write block 12,000 when asked. Files, folders, names and permissions are all bookkeeping the operating system builds on top. Here's the path your read takes on the way down:
+
+<Diagram name="p1-02-stack" alt="A read crosses one boundary and five kernel layers" />
+
+The dashed line is the one that matters. Your application and its runtime live in user space, where code isn't allowed near the hardware. To reach the disk it makes a system call (`open`, `read`, `write`), the CPU switches into kernel mode, and the kernel does the work on its behalf. The filesystem isn't a separate service waiting for requests; it's kernel code running inside your call.
+
+## 2. Waiting on the network vs waiting on the disk
+
+If you've used Node.js, you know the event loop must never block. For network sockets it manages that with **epoll**: the loop asks the kernel "which of these sockets has data?" and reads only from the ones that are ready.
+
+Files are different, and this one surprised me. A regular file is always reported as ready, even when its data is still on a spinning platter, because the waiting happens inside `read()` itself. epoll can't help, so runtimes take a different route:
+
+<Diagram name="p1-03-epoll" alt="Sockets wait on readiness, files wait on a worker thread" />
+
+In practice, a slow disk can quietly tie up Node's four default worker threads (`UV_THREADPOOL_SIZE`) while network traffic carries on as if nothing happened. It's also why storage-heavy systems are moving to `io_uring` (a topic for another day).
+
+## 3. Streaming: Reading a 5 GB file without 5 GB of RAM
+
+Whichever route a read takes, it ends in the same `read()` syscall. What changes is how much you ask for at once. Read the whole file in one go and you need memory the size of the file. Read it as a stream and you hold one small chunk at a time, pausing whenever the consumer can't keep up. That pause is called backpressure.
+
+<Diagram name="p1-04-streams" alt="Streams keep memory flat by pausing the reader" />
+
+Keep this picture in mind. It comes back in Part 2, when the AWS SDK streams an S3 object into your HTTP response.
+
+## 4. Inodes: how a path turns into block numbers
+
+So how does `/project/src/helper.ts` become a list of blocks? Every file and folder has an **inode**, a small record holding its size, owner, permissions, timestamps and, most importantly, the blocks where its data lives. Oddly, the inode doesn't hold the file's name. Names live in folders, and a folder is just a file containing a table of `name → inode` entries. Opening a path means walking that chain:
+
+<Diagram name="p1-05-inodes" alt="A path is a chain of directory lookups ending in block numbers" />
+
+Inodes are stored on disk so they survive a reboot, and the kernel caches them in RAM after first use. That's a pattern we'll meet again in S3: the disk is the source of truth, and memory is a fast cache in front of it.
+
+## 5. XFS: Making room for many writers at once
+
+Now imagine a hundred threads writing files at the same time. One inode table and one free-space map means one lock, and everyone queues behind it. XFS gets around this by cutting the volume into allocation groups, each with its own inodes, free-space map and lock. This is the picture that made S3's design click for me:
+
+<Diagram name="p1-06-xfs" alt="XFS splits one volume into allocation groups so parallel writes do not share a lock" />
+
+The lesson fits in one sentence: **split the metadata, give each piece its own lock, and let independent writers run in parallel.** S3 does the same thing, with servers instead of allocation groups.
+
+A few more things worth knowing about XFS:
+
+- **Origins:** built by SGI in 1993 for big media workloads, and the default filesystem on Red Hat Enterprise Linux since RHEL 7.
+- **Extents, not block lists:** a file's space is recorded as runs ("start at block 4810, length 3") kept in B+trees, so huge files stay cheap to map.
+- **Delayed allocation:** XFS picks the actual blocks only when data is flushed from the page cache, which keeps files contiguous on disk.
+- **Metadata-only journal:** the journal protects the filesystem's structure, not your file contents, so a crash can't corrupt the tree, though the last few unflushed writes can still be lost without `fsync`.
+- **Grows, never shrinks:** you can expand an XFS volume online, but you can't make it smaller.
+
+## 6. What if the power goes out mid-write?
+
+Parallel writes raise a scarier question. A single `write()` is really several steps: mark a block as used, put the data in it, update the inode, maybe update the folder. If the machine dies halfway through, an inode can end up pointing at garbage. Filesystems protect against this with a journal, also called a write-ahead log: write down what you're about to do, then do it.
+
+<Diagram name="p1-07-journal" alt="Log first, apply second: a crash at any point leaves a consistent disk" />
+
+Databases use exactly the same trick (Postgres calls it the WAL). S3's write path, as we'll see in Part 2, follows the same rule: make the data durable first, then make the change visible in one step.
+
+## Up next: taking this to S3
+
+That's one machine storing files: a syscall into the kernel, inodes mapping names to blocks, allocation groups for parallel writers, a journal for crashes, and caches everywhere to avoid touching the disk.
+
+Now stretch that across thousands of machines in three data centres, holding trillions of objects. Folders and in-place edits stop being worth what they cost, and something new is needed. **[Part 2](../how-object-storage-works/)** covers how object storage drops those features, and how S3 uses parity chunks, quorum writes and one carefully guarded index to never lose your data or hand you a stale copy.

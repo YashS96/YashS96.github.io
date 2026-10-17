@@ -1,0 +1,59 @@
+---
+import { getCollection, render } from 'astro:content';
+import Base from '../../layouts/Base.astro';
+
+export async function getStaticPaths() {
+  const posts = await getCollection('writing', ({ data }) => !data.draft);
+  return posts.map((post) => ({ params: { slug: post.id }, props: { post, posts } }));
+}
+
+const { post, posts } = Astro.props;
+const { Content } = await render(post);
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const fmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+
+const siblings = post.data.series
+  ? posts
+      .filter((p) => p.data.series === post.data.series)
+      .sort((a, b) => (a.data.part ?? 0) - (b.data.part ?? 0))
+  : [];
+const idx = siblings.findIndex((p) => p.id === post.id);
+const prev = idx > 0 ? siblings[idx - 1] : undefined;
+const next = idx >= 0 && idx < siblings.length - 1 ? siblings[idx + 1] : undefined;
+---
+
+<Base title={`${post.data.title} · Yash Shrivastava`} description={post.data.subtitle}>
+  <article class="article">
+    {
+      post.data.series && post.data.part && (
+        <p class="kicker">
+          {post.data.series} · Part {post.data.part} of {siblings.length}
+        </p>
+      )
+    }
+    <h1>{post.data.title}</h1>
+    <p class="subtitle">{post.data.subtitle}</p>
+    <div class="byline">Yash Shrivastava · {fmt.format(post.data.date)} · {post.data.readingTime}</div>
+    <div class="prose">
+      <Content />
+    </div>
+    {
+      (prev || next) && (
+        <nav class="series-nav" aria-label="Series navigation">
+          {prev && (
+            <>
+              <span class="label">Previous · Part {prev.data.part}</span>
+              <a href={`${base}/writing/${prev.id}/`}>{prev.data.title}</a>
+            </>
+          )}
+          {next && (
+            <>
+              <span class="label">Next · Part {next.data.part}</span>
+              <a href={`${base}/writing/${next.id}/`}>{next.data.title}</a>
+            </>
+          )}
+        </nav>
+      )
+    }
+  </article>
+</Base>

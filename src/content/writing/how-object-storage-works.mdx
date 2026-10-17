@@ -1,0 +1,115 @@
+---
+title: "How Object Storage Actually Works: Inside S3"
+subtitle: "From a single machine's filesystem to trillions of objects spread across three data centres."
+date: 2026-10-17
+series: "Storage from the ground up"
+part: 2
+readingTime: "8 min read"
+tags: ["s3", "object storage", "aws", "distributed systems", "system design"]
+---
+
+import Diagram from '../../components/Diagram.astro';
+
+In [Part 1](../how-filesystems-work/) we followed a `read()` from application code down to the disk: across the syscall boundary, through epoll and the thread pool, into inodes, XFS allocation groups and the journal. That's how one machine stores files.
+
+Now the harder question. How does S3 store trillions of objects, some of them terabytes in size, across thousands of machines, never lose one, and still hand you the latest version the moment your upload finishes? The surprise is that the filesystem ideas don't go away. They get scaled up.
+
+## How it happens
+
+Here's the whole journey on one map. The left half is what Part 1 covered; the right half is this article.
+
+<Diagram name="p2-01-map" alt="The whole journey from your machine into an S3 region" />
+
+## 1. Why S3 isn't just a giant filesystem
+
+Everything in Part 1 assumed one machine with one disk. Stretch folders, inodes and in-place edits across thousands of servers, and every rename and every small edit becomes a coordination problem. Object storage sidesteps that by giving those features up. There are no real folders and no editing in place, just keys pointing at blobs that never change once they're written.
+
+<Diagram name="p2-02-fs-vs-object" alt="A filesystem is a mutable tree; an object store is a flat map of immutable blobs" />
+
+| | Filesystem | Object store (S3) |
+| --- | --- | --- |
+| API | POSIX: open, seek, read, write | HTTP: PUT, GET (ranges), DELETE, LIST |
+| Update | In place, any offset | Replace the whole object |
+| Metadata | Inodes on the same disk | A separate distributed index |
+| Latency | Microseconds (page cache) | Tens of ms per request |
+
+That last row explains a neat real-world split. GitHub keeps Git repositories on local filesystems, because a `git diff` touches thousands of tiny objects, and puts LFS files, release downloads and backups in object storage.
+
+## 2. Inside S3: three layers
+
+So what does S3 look like from the inside? At the highest level, it's three layers:
+
+<Diagram name="p2-03-layers" alt="Metadata and bytes live in separate systems" />
+
+If that reminds you of XFS's allocation groups from Part 1, it should. Metadata and bytes live in separate systems so each can grow on its own. A request lands on a stateless front end, which asks the index where things live and talks to the storage fleet for the bytes themselves. Each storage node runs AWS's own engine, ShardStore, which is log-structured: new data is always appended, never overwritten, a natural fit for objects that never change.
+
+## 3. Surviving dead disks without keeping three copies
+
+With millions of drives, some are always failing. The obvious way never to lose data is to keep three full copies. S3 does better with erasure coding, and the maths is friendlier than it sounds. Take a file containing just the text `HI`. That's two bytes, so two data chunks. Add a parity chunk by XOR-ing them: 1 where the bits differ, 0 where they match.
+
+```text
+A (H)        = 01001000
+B (I)        = 01001001
+P = A XOR B  = 00000001
+lose A  ->  B XOR P = 01001000 = H
+```
+
+Lose any one of the three chunks and XOR-ing the other two brings it back. To survive more failures, add more parity chunks, each mixing the data with different weights (Reed-Solomon, over a Galois field). Think of them as equations: data chunks are the unknowns, and every stored chunk is one equation, like `P1 = A + B` and `P2 = A + 2B`. That leaves one rule worth remembering: **with k data and m parity chunks, any k of them rebuild the object, so you can lose any m.**
+
+<Diagram name="p2-04-erasure" alt="Any 5 of 9 pieces rebuild the object" />
+
+Each chunk also carries a **checksum**. Background scrubbers keep re-reading chunks to catch silent bit rot, and when one goes missing they rebuild just that chunk onto a healthy disk, not the whole object.
+
+## 4. Following a PUT
+
+Now let's put the pieces together. Here's everything that happens between calling `PutObject` and getting back a 200:
+
+<Diagram name="p2-05-put" alt="A PUT is acknowledged only after chunks and index are durable across zones" />
+
+**Why wait for a quorum?** If S3 waited for every disk, one slow node would stall every write. A quorum guarantees enough chunks exist to rebuild the object, and background repair fills in the stragglers. Availability zones in a region are only a few milliseconds apart, so the wait is cheap. If you read Part 1, this is the journal again: make the data durable first, then make it visible in one step.
+
+**Big files** go up as a multipart upload. Each part runs steps 1 to 4 on its own and in parallel, a failed part is simply retried, and step 5 happens just once, at `CompleteMultipartUpload`. One gotcha: parts of an abandoned upload stay billed until you abort it or a lifecycle rule cleans it up.
+
+## 5. Following a GET
+
+Reading is where all that spreading-out pays off. No single hard disk is fast, but thousands of them working at once are. The SDK makes that happen by splitting a big download into byte ranges and fetching them side by side:
+
+<Diagram name="p2-06-get" alt="Big reads are many small parallel range reads, streamed with backpressure" />
+
+If you read Part 1, this will look familiar. The connections are ordinary sockets driven by epoll, and the bytes reach your code through the same backpressure loop as a file stream. The only difference is that they arrive over HTTP rather than from a local disk.
+
+## 6. The index: the real heart of S3
+
+Both paths start and end at the same place: the index. Every GET begins with a lookup there, and every overwrite or delete is, in the end, just a change to it. For each object version it holds one immutable record: key, version ID, ETag, size and the locations of its chunks. With hundreds of trillions of objects, it has to be split up, and it's split the way XFS splits its metadata:
+
+<Diagram name="p2-07-index" alt="The index is split by sorted key range and every range is replicated across AZs" />
+
+Sorting by key is why `LIST photos/2026/` is fast: those keys sit right next to each other. It's also the catch, because date-first keys all pile into the same range. Multi-tenancy works the same way. Every key starts with its bucket name, but chunks from millions of customers share the same disks, kept apart by authentication, per-customer encryption keys and per-prefix rate limits (roughly 3,500 writes and 5,500 reads per second).
+
+## 7. Why you never read stale data
+
+Since December 2020, S3 has been strongly consistent: once a PUT returns, every read in that region sees the new version. Immutability does most of the heavy lifting. Chunks never change, so they can't be stale. The only thing that can fall behind is a cached copy of an index entry, and that's exactly what the witness guards against:
+
+<Diagram name="p2-08-consistency" alt="Overwrite is new chunks plus one atomic index flip; a witness keeps caches honest" />
+
+| Scenario | What happens |
+| --- | --- |
+| Overwrite mid-read | Reader finishes the complete old version; nothing locks |
+| DELETE | Index row goes first (instant 404); GC reclaims chunks later |
+| Two writers, same key | Last write wins, unless you use `If-Match` / `If-None-Match` |
+| Cross-region replication | Eventual; strong consistency stops at the region |
+
+## 8. Staying up while things break
+
+Durability means your data is never lost. Availability means you can reach it right now, even while disks, servers and entire zones are failing. They're different promises, and a handful of mechanisms keep the second one:
+
+| Mechanism | Survives |
+| --- | --- |
+| Stateless front ends in every AZ | A dead server or a whole AZ |
+| Reads need any k of k + m chunks | Dead or slow disks |
+| Replicated index partitions | A dead index server |
+| Timeouts + hedged requests | The one slow disk in thousands |
+
+One last thing that confused me: storage classes. None of them are RAM; they trade price against how long the first byte takes. Express One Zone uses faster hardware in a single zone. Standard and Infrequent Access run on hard disks, with IA charging per read. Glacier is reportedly backed by tape and powered-down drives, which is why restores take minutes to hours.
+
+*Further reading: "Using Lightweight Formal Methods to Validate a Key-Value Storage Node in Amazon S3" (ShardStore, SOSP 2021); Werner Vogels, "Diving Deep on S3 Consistency" (All Things Distributed, 2021).*

@@ -1,0 +1,30 @@
+---
+import { getCollection } from 'astro:content';
+import Base from '../../layouts/Base.astro';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const posts = (await getCollection('writing', ({ data }) => !data.draft)).sort(
+  (a, b) =>
+    b.data.date.getTime() - a.data.date.getTime() || (a.data.part ?? 0) - (b.data.part ?? 0),
+);
+const fmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+---
+
+<Base title="Writing · Yash Shrivastava" description="Deep dives into how systems actually work, with diagrams.">
+  <section class="listing">
+    <h1>Writing</h1>
+    <p class="lead">Deep dives into how systems actually work, one diagram at a time.</p>
+    {
+      posts.map((post) => (
+        <a class="post-card" href={`${base}/writing/${post.id}/`}>
+          <div class="post-meta">
+            {post.data.series && post.data.part ? `${post.data.series} · Part ${post.data.part} · ` : ''}
+            {fmt.format(post.data.date)} · {post.data.readingTime}
+          </div>
+          <h2>{post.data.title}</h2>
+          <p>{post.data.subtitle}</p>
+        </a>
+      ))
+    }
+  </section>
+</Base>

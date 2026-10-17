@@ -1,0 +1,29 @@
+---
+/**
+ * Inlines a pre-rendered SVG from src/diagrams so it inherits the page's
+ * theme variables (light/dark). Fails the build if the name is unknown.
+ */
+interface Props {
+  name: string;
+  alt?: string;
+}
+
+const { name, alt } = Astro.props;
+const svgs = import.meta.glob<string>('../diagrams/*.svg', {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+});
+const svg = svgs[`../diagrams/${name}.svg`];
+if (!svg) {
+  throw new Error(
+    `Diagram "${name}" not found. Run "npm run diagrams" and check src/diagrams/. Available: ${Object.keys(svgs)
+      .map((k) => k.replace('../diagrams/', '').replace('.svg', ''))
+      .join(', ')}`,
+  );
+}
+---
+
+<figure class="figure" aria-label={alt}>
+  <div class="figure-scroll" set:html={svg} />
+</figure>
