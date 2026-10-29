@@ -1,0 +1,223 @@
+---
+title: "Isolation Levels and Locking: What Your Database Is Actually Promising You"
+subtitle: "Isolation decides what a transaction can see. Locking decides who has to wait. PostgreSQL, one running example, eight diagrams."
+date: 2026-10-29
+readingTime: "9 min read"
+tags: ["postgresql", "databases", "transactions", "concurrency", "locking", "system design"]
+---
+
+import Diagram from '../../components/Diagram.astro';
+
+Isolation and locking get used as if they mean the same thing. They don't. **Isolation** decides what a transaction is allowed to *see* of other transactions' work. **Locking** decides who has to *wait* when two transactions want to change the same row. PostgreSQL behaviour throughout.
+
+## The running example
+
+A row holds `balance = 100`. **T1** updates it to `50` and hasn't committed. **T2** arrives and touches the same row. Every section answers one question: what can T2 do, and what does it see?
+
+## MVCC: why readers don't wait
+
+- An `UPDATE` writes a **new row version**; the old one stays in the table.
+- Each version is tagged with the transaction that created it.
+- A **snapshot** is a list of which transactions had committed. No data is copied.
+- Versions from uncommitted transactions are invisible. `VACUUM` removes dead ones later.
+
+<Diagram name="db-01-mvcc" alt="T2 reads the committed version while T1 writes a new one" />
+
+## The four isolation levels
+
+<Diagram name="db-02-levels" alt="Each isolation level closes one more anomaly" />
+
+Read Committed, highlighted, is the Postgres default. Set the level per transaction, per session, or as a default:
+
+```sql
+-- per transaction
+BEGIN ISOLATION LEVEL REPEATABLE READ;
+-- ... queries ...
+COMMIT;
+
+-- or as the first statement after BEGIN
+SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+
+-- per session, or a database-wide default
+SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL READ COMMITTED;
+ALTER DATABASE app SET default_transaction_isolation = 'repeatable read';
+
+-- check the current level
+SHOW transaction_isolation;
+```
+
+## Read Committed vs Repeatable Read
+
+The only difference is **when the snapshot is taken**: per statement, or once per transaction.
+
+<Diagram name="db-03-rc-vs-rr" alt="After T1 commits, Read Committed sees 50 while Repeatable Read still sees 100" />
+
+Red is the non-repeatable read: same query, same transaction, different answer.
+
+Repeatable Read also refuses stale writes. If T2 updates a row that changed after its snapshot:
+
+```text
+ERROR:  could not serialize access due to concurrent update   -- SQLSTATE 40001
+```
+
+## Serializable: write skew
+
+Two transactions read overlapping data, write **different** rows, and together break a rule. No row lock ever conflicts.
+
+<Diagram name="db-04-write-skew" alt="Each transaction is valid on its snapshot, but together they leave nobody on call" />
+
+Postgres uses **SSI** (Serializable Snapshot Isolation): reads still come from snapshots, but it tracks read-write dependencies and aborts one transaction at commit with `40001`.
+
+## Row locks
+
+| Statement | Lock | Blocks |
+| --- | --- | --- |
+| `SELECT` | none | nothing |
+| `SELECT ... FOR SHARE` | shared | writers |
+| `SELECT ... FOR UPDATE` | exclusive | writers and other lockers |
+| `UPDATE` / `DELETE` | exclusive, automatic | writers and other lockers |
+
+Plain `SELECT` is never blocked. Locks are held until `COMMIT` or `ROLLBACK`.
+
+```sql
+BEGIN;
+SET LOCAL lock_timeout = '3s';            -- cap any lock wait in this tx
+
+-- exclusive: I'm about to change this
+SELECT balance FROM accounts WHERE id = 1 FOR UPDATE;
+
+-- shared: nobody change this while I rely on it
+SELECT id FROM customers WHERE id = 7 FOR SHARE;
+
+-- fail immediately instead of waiting
+SELECT * FROM accounts WHERE id = 1 FOR UPDATE NOWAIT;
+
+-- job queue: take rows nobody else holds
+SELECT * FROM jobs
+WHERE status = 'pending'
+ORDER BY id
+LIMIT 10
+FOR UPDATE SKIP LOCKED;
+COMMIT;
+```
+
+## The lost update
+
+Read, decide in code, write: that gap is the bug. Lock the read to close it.
+
+<Diagram name="db-05-lost-update" alt="Locking the read makes T2 wait for fresh data" />
+
+- `FOR UPDATE` only works if **every** read-then-write path uses it.
+- Plain `SELECT` + `SET balance = 120` still clobbers. `SET balance = balance + 20` survives, because Postgres re-reads the row after the wait.
+
+## One write path
+
+<Diagram name="db-06-write-paths" alt="Every write path goes through one data access layer" />
+
+Locking and retries are written once, so no entry point can forget them. Admin overrides get no shortcut. Prefer one atomic statement; there is no read to go stale:
+
+```sql
+UPDATE accounts
+SET balance = balance - 20
+WHERE id = 1 AND balance >= 20;   -- 0 rows = insufficient funds
+```
+
+Use `FOR UPDATE` only for multi-step logic, lock only what you'll write, and make no external calls while a lock is held.
+
+## Deadlocks
+
+<Diagram name="db-07-deadlock" alt="Opposite lock order deadlocks; one fixed order just queues" />
+
+The fix is one fixed lock order everywhere:
+
+```sql
+SELECT * FROM accounts
+WHERE id = ANY($1)
+ORDER BY id
+FOR UPDATE;
+```
+
+Postgres checks after `deadlock_timeout` (1s by default) and kills one transaction with `40P01`.
+
+## Batch size and contention
+
+| Trade-off | Big batches | Small batches |
+| --- | --- | --- |
+| Throughput | Higher | Lower |
+| Lock hold time | Long, blocks live edits | Short |
+| Failure cost | Large rollback | Cheap retry |
+
+- On live tables, start at a few hundred to a thousand rows per transaction, then measure.
+- One hot row (a global counter) serialises every writer. Shard it, or append events and aggregate.
+
+## Advisory locks
+
+A lock on a **number**, not a row. It blocks nothing in any table, only code that asks for the same key. In practice, a distributed lock with Postgres as coordinator.
+
+<Diagram name="db-08-advisory" alt="Three pods race for lock 42; exactly one runs the job" />
+
+```sql
+-- transaction-scoped (preferred): released at COMMIT / ROLLBACK
+SELECT pg_try_advisory_xact_lock(42);   -- true / false, no wait
+SELECT pg_advisory_xact_lock(42);       -- waits
+
+-- session-scoped: held until unlock or disconnect
+SELECT pg_advisory_lock(42);
+SELECT pg_advisory_unlock(42);
+
+-- namespaced keys
+SELECT pg_try_advisory_xact_lock(7, 1001);                  -- (feature, id)
+SELECT pg_try_advisory_xact_lock(hashtext('daily-report'));
+```
+
+- No TTL. A crashed pod's connection drops and the lock frees instantly.
+- A hung pod keeps it. Set `idle_in_transaction_session_timeout`.
+- Behind PgBouncer in transaction mode, use only the `xact` variants.
+
+## Retries
+
+Retry the **whole transaction**, never just the failed statement.
+
+| SQLSTATE | Meaning | Retry |
+| --- | --- | --- |
+| `40001` | Serialization failure | Yes |
+| `40P01` | Deadlock detected | Yes |
+| `55P03` | Lock not available | Maybe, or return "busy" |
+| other | Constraint, bad input | No |
+
+```typescript
+import { Pool, PoolClient } from "pg";
+
+const RETRYABLE = new Set(["40001", "40P01"]);
+
+export async function withRetry<T>(
+  pool: Pool,
+  fn: (c: PoolClient) => Promise<T>,
+  maxAttempts = 4,
+): Promise<T> {
+  for (let attempt = 1; ; attempt++) {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const result = await fn(client);
+      await client.query("COMMIT");
+      return result;
+    } catch (err: any) {
+      await client.query("ROLLBACK").catch(() => {});
+      if (!RETRYABLE.has(err?.code) || attempt >= maxAttempts) throw err;
+      const backoff = 10 * 2 ** (attempt - 1);
+      await new Promise((r) => setTimeout(r, backoff + Math.random() * backoff));
+    } finally {
+      client.release();
+    }
+  }
+}
+```
+
+Keep emails and payment calls outside `fn`, or make them idempotent.
+
+## The short version
+
+- **Isolation protects reads:** which committed versions you can see.
+- **Locking protects decisions:** nothing changes between your read and your write.
+- **Funnel writes, lock in order, keep transactions short, retry the whole thing.**
